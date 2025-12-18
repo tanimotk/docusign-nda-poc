@@ -1,0 +1,53 @@
+# Private keys - NEVER commit these
+private.key
+private.key.txt
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Test outputs
+docusign_nda_poc/tests/last_envelope_id.txt
+docusign_nda_poc/tests/signed_*.pdf
+
+# Environment variables
+.env
+.env.local
+*.env
+
+# OS files
+.DS_Store
+Thumbs.db
