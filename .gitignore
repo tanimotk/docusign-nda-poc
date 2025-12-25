@@ -51,3 +51,4 @@ docusign_nda_poc/tests/signed_*.pdf
 # OS files
 .DS_Store
 Thumbs.db
+docusign_nda_poc/tests/last_template_id.txt

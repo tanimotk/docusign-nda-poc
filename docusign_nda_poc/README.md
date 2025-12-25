@@ -1,17 +1,20 @@
 # DocuSign NDA POC
 
-DocuSign API を使用した NDA（秘密保持契約）締結機能の検証用スクリプト集です。
+DocuSign API を使用した署名機能の検証用スクリプト集です。
 
 ## 概要
 
-このPOCは、DCP（Digital Community Platform）における NDA 締結フローを DocuSign API で実装するための検証を目的としています。
+DocuSign eSignature REST API の基本機能を検証するためのサンプルです。
 
 ### 主な機能
 
 - JWT Grant 認証によるアクセストークン取得
-- Signing Group（1名以上の署名者、1人署名で完了）対応
+- Signing Group（複数人に送信、1人署名で完了）対応
   - アンカータグ方式（PDF内に署名位置を埋め込み）
   - Free Form 方式（署名者が位置を選択）
+- **Template 方式**（PDFをDocuSign上に保存して再利用）
+  - テンプレート作成・管理
+  - テンプレートからの署名依頼送信
 - エンベロープステータス確認
 - 署名済みPDFのダウンロード
 - Webhook（DocuSign Connect）によるイベント受信
@@ -31,12 +34,15 @@ docusign_nda_poc/
 │   └── webhook_event.py      # Webhook イベントモデル
 ├── services/
 │   ├── envelope_service.py   # エンベロープ操作サービス
+│   ├── template_service.py   # テンプレート操作サービス
 │   └── webhook_service.py    # Webhook 処理サービス
 ├── tests/
 │   ├── test_auth.py                      # JWT 認証テスト
 │   ├── test_envelope_recipient_group.py  # Signing Group テスト（Anchor）
 │   ├── test_envelope_free_form.py        # Signing Group テスト（Free Form）
-│   └── test_check_status.py              # ステータス確認/PDF取得
+│   ├── test_check_status.py              # ステータス確認/PDF取得
+│   ├── test_template_create.py           # テンプレート作成
+│   └── test_template_send.py             # テンプレートから送信
 └── webhook_output/           # 受信した Webhook データの保存先
 ```
 
@@ -75,11 +81,53 @@ uv run docusign_nda_poc/run_tests.py
 
 ```bash
 # テスト番号を引数で指定
+
+# --- PDF Upload 方式 ---
 python docusign_nda_poc/run_tests.py 1  # JWT 認証テスト
 python docusign_nda_poc/run_tests.py 2  # Signing Group テスト（Anchor）
 python docusign_nda_poc/run_tests.py 3  # Signing Group テスト（Free Form）
 python docusign_nda_poc/run_tests.py 4  # ステータス確認
+
+# --- Template 方式 ---
+python docusign_nda_poc/run_tests.py 5  # テンプレート作成
+python docusign_nda_poc/run_tests.py 6  # テンプレートから送信
 ```
+
+## 2つの実装方式
+
+### PDF Upload 方式（Test 2-3）
+
+署名依頼のたびにPDFをアップロードする方式です。
+
+```
+[サービス側] PDF生成 → [DocuSign] アップロード → 署名依頼送信
+```
+
+**メリット:**
+- 動的にPDFを生成できる
+- テンプレート管理が不要
+
+**デメリット:**
+- 毎回PDFをアップロードする必要がある
+- サービス側でPDFを保持する必要がある
+
+### Template 方式（Test 5-6）
+
+PDFをDocuSign上にテンプレートとして保存し、再利用する方式です。
+
+```
+[初回] PDF → DocuSign にテンプレート作成（Test 5）
+[以降] テンプレートID指定 → 署名依頼送信（Test 6）
+```
+
+**メリット:**
+- PDFアップロードが不要（テンプレートID指定のみ）
+- サービス側でPDFを保持しなくてよい
+- 署名依頼が高速
+
+**デメリット:**
+- VCごとにテンプレート管理が必要
+- テンプレート更新時は再作成
 
 ## テスト内容
 
@@ -95,14 +143,12 @@ DocuSign への JWT 認証が正常に動作するか確認します。
 
 ### Test 2: Signing Group テスト（Anchor）
 
-1名以上の署名者を指定し、**誰か1人が署名すれば完了**となるエンベロープを送信します。
+複数人に署名依頼を送信し、**誰か1人が署名すれば完了**となるエンベロープを作成します。
 
 - 入力: 1名以上の署名者（メールアドレス、名前）
 - 全員に署名依頼メールが送信される
 - 1人が署名すると、他のメンバーには完了通知が届く
 - 署名位置: PDF内のアンカータグ `/sn1/` で自動配置
-
-これは仕様書の「Academia/Startup側の複数TOメンバーのうち1人が署名すればOK」要件に対応しています。
 
 **実装詳細**: DocuSign の `SigningGroup` API を使用。エンベロープ作成時に一時的な Signing Group を動的に作成し、送信後に削除する方式（アカウント上限50グループを回避）。
 
@@ -120,8 +166,79 @@ Test 2 と同様の Signing Group 機能ですが、署名位置を署名者が�
 
 既存のエンベロープのステータスを確認し、完了していれば署名済みPDFをダウンロードします。
 
-- 入力: Envelope ID（Test 2/3 実行後に保存される）
+- 入力: Envelope ID（Test 2/3/6 実行後に保存される）
 - 出力: `tests/signed_XXXXXXXX.pdf`
+
+### Test 5: テンプレート作成
+
+PDFをDocuSign上にテンプレートとして保存します。
+
+- 入力: PDF ファイル、テンプレート名
+- 出力: Template ID（`tests/last_template_id.txt` に保存）
+- 署名位置はアンカータグ `/sn1/` で指定
+
+### Test 6: テンプレートから送信
+
+既存のテンプレートを使って署名依頼を送信します。
+
+- 入力: Template ID、署名者情報
+- PDFアップロード不要（DocuSign上のテンプレートを使用）
+- 単一署名者 / Signing Group（複数署名者）どちらも対応
+
+## Template 方式のコード例
+
+### テンプレート作成
+
+```python
+from docusign_nda_poc.services.template_service import TemplateService
+
+service = TemplateService()
+
+# PDFをテンプレートとして登録
+template_info = service.create_template(
+    document_base64=pdf_base64,
+    document_name="contract.pdf",
+    template_name="My Template",
+    template_description="サンプルテンプレート",
+)
+
+# Template ID を保存
+template_id = template_info.template_id
+```
+
+### 署名依頼送信
+
+```python
+# 単一署名者
+response = service.create_envelope_from_template(
+    template_id=template_id,
+    signer_email="signer@example.com",
+    signer_name="署名者",
+)
+
+# Signing Group（複数人に送信、1人署名で完了）
+response = service.create_envelope_from_template_with_signing_group(
+    template_id=template_id,
+    signers=[
+        {"name": "署名者A", "email": "a@example.com"},
+        {"name": "署名者B", "email": "b@example.com"},
+    ],
+)
+```
+
+### テンプレート更新・削除
+
+```python
+# ドキュメントを更新
+service.update_template_document(
+    template_id=template_id,
+    document_base64=new_pdf_base64,
+    document_name="contract_v2.pdf",
+)
+
+# テンプレートを削除
+service.delete_template(template_id)
+```
 
 ## アンカータグについて
 
@@ -139,15 +256,15 @@ PDF内のテキスト    →  APIで指定    →  署名欄が自動配置
 | 署名欄 | `/sn1/` | サンプルPDFに埋め込み済み |
 | 日付欄 | `/sn1/` + オフセット | 暫定対応 |
 
-### 本番環境への対応（TODO）
+### カスタムPDFを使用する場合
 
-VC/Pharma がアップロードする NDA PDF に埋め込むアンカータグを事前に決定し、ガイドラインとして提供する必要があります。
+署名位置を自動配置するには、PDF内にアンカータグを埋め込む必要があります。
 
 例:
 - 署名欄: `/sn1/` を署名位置に白文字で記載
 - 日付欄: `/dn1/` を日付位置に白文字で記載
 
-詳細は `models/nda_request.py` の TODO コメントを参照してください。
+アンカータグを埋め込まないPDFの場合は、Free Form方式（Test 3）を使用してください。
 
 ## 注意事項
 
@@ -262,15 +379,8 @@ webhook_service = WebhookService(hmac_key="your-hmac-key-from-docusign")
 
 DocuSign Connect 設定で HMAC キーを生成し、`X-DocuSign-Signature-1` ヘッダーで検証します。
 
-## 次のステップ
-
-1. FastAPI Clean Architecture への統合
-2. 本番環境用アンカータグの決定
-3. 通知設定の調整
-4. HMAC 署名検証の有効化
-
 ## 関連ドキュメント
 
-- [Notion 仕様書: DocuSign連携・NDA締結機能](https://www.notion.so/DocuSign-NDA-2b933e5f7882813eb1f4e0782e63902f)
 - [DocuSign eSignature REST API](https://developers.docusign.com/docs/esign-rest-api/)
 - [JWT Grant Authentication](https://developers.docusign.com/platform/auth/jwt/)
+- [Templates API](https://developers.docusign.com/docs/esign-rest-api/reference/templates/)

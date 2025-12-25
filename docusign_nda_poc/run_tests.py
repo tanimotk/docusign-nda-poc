@@ -10,6 +10,9 @@ Tests:
     2. Signing Group Envelope with Anchor (1+ signers, one signature required)
     3. Signing Group Envelope with Free Form (1+ signers, signer chooses position)
     4. Check Status / Download Document
+    ---
+    5. Create Template (upload PDF to DocuSign)
+    6. Send from Template (use stored template)
 """
 import sys
 from pathlib import Path
@@ -23,7 +26,7 @@ def show_menu():
     print("\n" + "=" * 60)
     print("DocuSign NDA POC - Test Menu")
     print("=" * 60)
-    print("\nAvailable tests:")
+    print("\n[PDF Upload Method - 毎回PDFをアップロード]")
     print("  1. JWT Authentication Test")
     print("     - Verifies JWT token generation and API access")
     print("")
@@ -41,6 +44,17 @@ def show_menu():
     print("  4. Check Status / Download Document")
     print("     - Check envelope status")
     print("     - Download signed PDF if completed")
+    print("")
+    print("-" * 60)
+    print("[Template Method - DocuSign上にPDFを保存]")
+    print("  5. Create Template")
+    print("     - Upload PDF to DocuSign as a template")
+    print("     - Template is stored on DocuSign for reuse")
+    print("")
+    print("  6. Send from Template")
+    print("     - Send signing request using existing template")
+    print("     - No PDF upload required (uses stored template)")
+    print("     - Supports single signer or Signing Group")
     print("")
     print("  0. Exit")
     print("")
@@ -63,6 +77,14 @@ def run_test(test_number: int) -> bool:
     elif test_number == 4:
         from docusign_nda_poc.tests.test_check_status import test_check_status
         return test_check_status()
+
+    elif test_number == 5:
+        from docusign_nda_poc.tests.test_template_create import test_create_template
+        return test_create_template()
+
+    elif test_number == 6:
+        from docusign_nda_poc.tests.test_template_send import test_send_from_template
+        return test_send_from_template()
 
     else:
         print(f"Unknown test number: {test_number}")
@@ -88,7 +110,7 @@ def main():
     while True:
         show_menu()
         try:
-            choice = input("Select test (0-4): ").strip()
+            choice = input("Select test (0-6): ").strip()
             if not choice:
                 continue
 
@@ -97,8 +119,8 @@ def main():
                 print("\nExiting. Goodbye!")
                 break
 
-            if test_number < 1 or test_number > 4:
-                print("Invalid choice. Please select 0-4.")
+            if test_number < 1 or test_number > 6:
+                print("Invalid choice. Please select 0-6.")
                 continue
 
             run_test(test_number)
