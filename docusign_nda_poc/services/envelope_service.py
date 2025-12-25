@@ -1,10 +1,8 @@
 """
 DocuSign Envelope Service
 
-Handles envelope creation with Recipient Group support.
+Handles envelope creation with Signing Group support.
 """
-import base64
-from pathlib import Path
 from typing import Optional
 
 import uuid
@@ -35,78 +33,6 @@ class EnvelopeService:
 
     def __init__(self, auth: Optional[DocuSignAuth] = None):
         self.auth = auth or DocuSignAuth()
-
-    def create_envelope_simple(
-        self,
-        document_path: Path,
-        signer_name: str,
-        signer_email: str,
-        email_subject: str = "署名をお願いします",
-    ) -> EnvelopeResponse:
-        """
-        Create a simple envelope with a single signer.
-        Useful for testing basic functionality.
-
-        Args:
-            document_path: Path to the PDF document
-            signer_name: Name of the signer
-            signer_email: Email of the signer
-            email_subject: Subject of the email
-
-        Returns:
-            EnvelopeResponse with envelope_id and status
-        """
-        # Read and encode document
-        with open(document_path, "rb") as f:
-            document_bytes = f.read()
-        document_base64 = base64.b64encode(document_bytes).decode("ascii")
-
-        # Create document
-        document = Document(
-            document_base64=document_base64,
-            name=document_path.name,
-            file_extension="pdf",
-            document_id="1",
-        )
-
-        # Create signer with signature tab
-        signer = Signer(
-            email=signer_email,
-            name=signer_name,
-            recipient_id="1",
-            routing_order="1",
-        )
-
-        # Add signature tab using anchor string
-        # サンプルPDF (World_Wide_Corp_lorem.pdf) は /sn1/ を使用
-        sign_here = SignHere(
-            anchor_string="/sn1/",
-            anchor_units="pixels",
-            anchor_x_offset="20",
-            anchor_y_offset="10",
-        )
-        signer.tabs = Tabs(sign_here_tabs=[sign_here])
-
-        # Create envelope definition
-        envelope_definition = EnvelopeDefinition(
-            email_subject=email_subject,
-            documents=[document],
-            recipients=Recipients(signers=[signer]),
-            status="sent",
-        )
-
-        # Get authenticated API client
-        api_client = self.auth.get_api_client()
-        token = self.auth.authenticate()
-
-        # Create envelope
-        envelopes_api = EnvelopesApi(api_client)
-        result = envelopes_api.create_envelope(
-            account_id=token.account_id,
-            envelope_definition=envelope_definition,
-        )
-
-        return EnvelopeResponse.from_api_response(result)
 
     def create_envelope_with_signing_group(
         self, request: NDARequest
