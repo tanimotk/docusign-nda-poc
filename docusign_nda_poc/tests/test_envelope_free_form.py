@@ -1,5 +1,8 @@
 """
-Test script for Envelope Creation with Signing Group
+Test script for Envelope Creation with Free Form Signing
+
+This test creates an envelope where signature position is NOT predefined.
+The signer will choose where to place their signature on the PDF.
 """
 import base64
 import sys
@@ -11,17 +14,23 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from docusign_esign.client.api_exception import ApiException
 from docusign_nda_poc.auth.jwt_auth import DocuSignAuth
 from docusign_nda_poc.services.envelope_service import EnvelopeService
-from docusign_nda_poc.models.nda_request import NDARequest, Signer, WebhookConfig
+from docusign_nda_poc.models.nda_request import (
+    NDARequest,
+    Signer,
+    WebhookConfig,
+    SignaturePosition,
+    DateSignedPosition,
+)
 
 
-def test_signing_group_envelope():
-    """Test envelope creation with Signing Group using anchor tags (1+ signers, one signature required)"""
+def test_free_form_envelope():
+    """Test envelope creation with Free Form Signing (signer chooses signature position)"""
     print("=" * 60)
-    print("DocuSign Signing Group Envelope Test (Anchor)")
+    print("DocuSign Free Form Signing Test")
     print("=" * 60)
-    print("\nThis test creates an envelope where all recipients")
-    print("receive the signing request, but only ONE signature is required.")
-    print("\nSignature position: Anchor tag /sn1/ (for PDFs with embedded anchor)")
+    print("\nThis test creates an envelope where the signer chooses")
+    print("where to place their signature on the PDF.")
+    print("\nUse this for PDFs without anchor tags (e.g., user-uploaded PDFs).")
 
     # Get test parameters
     print("\n[Input] Enter test parameters:")
@@ -46,20 +55,28 @@ def test_signing_group_envelope():
     for s in signers:
         print(f"    - {s.name} <{s.email}>")
 
-    # Use demo PDF from existing static files or specify path
+    # Use demo PDF or custom path
     demo_docs_path = Path(__file__).parent.parent.parent / "app" / "static" / "demo_documents"
     pdf_path = demo_docs_path / "World_Wide_Corp_lorem.pdf"
 
-    if not pdf_path.exists():
-        print(f"\n[WARNING] Demo PDF not found at: {pdf_path}")
-        custom_path = input("  Enter path to a PDF file: ").strip()
+    print(f"\n[Document Selection]")
+    print(f"  Default: {pdf_path}")
+    custom_path = input("  Enter custom PDF path (or press Enter for default): ").strip()
+
+    if custom_path:
         pdf_path = Path(custom_path)
-        if not pdf_path.exists():
-            print(f"[ERROR] File not found: {pdf_path}")
-            return False
+
+    if not pdf_path.exists():
+        print(f"[ERROR] File not found: {pdf_path}")
+        return False
 
     print(f"\n  Using document: {pdf_path}")
-    print("  Signature position: Anchor tag /sn1/")
+
+    # Free Form - no anchor tags
+    print("\n[Signature Position]")
+    print("  -> Free Form Signing: Signer will choose signature position")
+    signature_position = SignaturePosition.free_form()
+    date_signed_position = DateSignedPosition.free_form()
 
     # Webhook configuration (optional)
     print("\n[Webhook Configuration]")
@@ -83,14 +100,16 @@ def test_signing_group_envelope():
             document_bytes = f.read()
         document_base64 = base64.b64encode(document_bytes).decode("ascii")
 
-        # Create NDA request with Signing Group (using default anchor position)
+        # Create NDA request with Free Form Signing
         nda_request = NDARequest(
             document_base64=document_base64,
             document_name="NDA_テスト用秘密保持契約書.pdf",
-            email_subject="【DCP】NDA締結のお願い（テスト）",
-            email_blurb="秘密保持契約書への署名をお願いいたします。グループ内のどなたか1名が署名すれば完了となります。",
+            email_subject="【DCP】NDA締結のお願い（Free Form テスト）",
+            email_blurb="秘密保持契約書への署名をお願いいたします。署名欄は、PDFを開いた後にご自身で配置してください。",
             signers=signers,
-            group_name="DCP_NDA_SigningGroup",
+            group_name="DCP_NDA_FreeForm_SigningGroup",
+            signature_position=signature_position,
+            date_signed_position=date_signed_position,
             webhook_config=webhook_config,
         )
 
@@ -98,10 +117,10 @@ def test_signing_group_envelope():
         print(f"    - Document: {nda_request.document_name}")
         print(f"    - Group Name: {nda_request.group_name}")
         print(f"    - Signers: {len(nda_request.signers)}")
-        print(f"    - Signature Mode: Anchor tag /sn1/")
+        print(f"    - Signature Mode: Free Form (signer chooses position)")
         print(f"    - Webhook: {'Configured' if nda_request.webhook_config else 'Not configured'}")
 
-        print("\n[3] Creating envelope with Signing Group...")
+        print("\n[3] Creating envelope with Free Form Signing...")
         response = service.create_envelope_with_signing_group(nda_request)
 
         print("\n[SUCCESS] Envelope created!")
@@ -112,6 +131,7 @@ def test_signing_group_envelope():
 
         print(f"\n[INFO] Signing requests have been sent to all {len(signers)} recipients.")
         print("  Any ONE of them can sign to complete the envelope.")
+        print("\n  NOTE: Signers will need to place signature fields manually.")
 
         # Save envelope ID for later use
         envelope_id_file = Path(__file__).parent / "last_envelope_id.txt"
@@ -126,13 +146,14 @@ def test_signing_group_envelope():
             print(f"  - Current Status: {status_response.status}")
 
         print("\n" + "=" * 60)
-        print("Signing Group envelope test (Anchor) completed!")
+        print("Free Form Signing envelope test completed!")
         print("=" * 60)
         print("\nNext steps:")
         print("  1. Check email for all recipients")
-        print("  2. Have ONE recipient sign the document")
-        print("  3. Verify that the envelope status changes to 'completed'")
-        print(f"  4. Use envelope ID: {response.envelope_id} to check status later")
+        print("  2. Open the signing link and place signature manually")
+        print("  3. Have ONE recipient sign the document")
+        print("  4. Verify that the envelope status changes to 'completed'")
+        print(f"  5. Use envelope ID: {response.envelope_id} to check status later")
         return True
 
     except ApiException as e:
@@ -150,5 +171,5 @@ def test_signing_group_envelope():
 
 
 if __name__ == "__main__":
-    success = test_signing_group_envelope()
+    success = test_free_form_envelope()
     sys.exit(0 if success else 1)

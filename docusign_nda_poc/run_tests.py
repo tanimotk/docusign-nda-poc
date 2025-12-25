@@ -7,8 +7,8 @@ Usage:
 
 Tests:
     1. JWT Authentication
-    2. Simple Envelope (single signer)
-    3. Recipient Group Envelope (multiple signers, one signature)
+    2. Signing Group Envelope with Anchor (1+ signers, one signature required)
+    3. Signing Group Envelope with Free Form (1+ signers, signer chooses position)
     4. Check Status / Download Document
 """
 import sys
@@ -27,13 +27,16 @@ def show_menu():
     print("  1. JWT Authentication Test")
     print("     - Verifies JWT token generation and API access")
     print("")
-    print("  2. Simple Envelope Test (Single Signer)")
-    print("     - Creates envelope with one signer")
-    print("     - Good for basic functionality verification")
-    print("")
-    print("  3. Recipient Group Envelope Test")
-    print("     - Creates envelope with multiple signers")
+    print("  2. Signing Group Envelope Test (Anchor)")
+    print("     - Creates envelope with 1+ signers")
     print("     - Only ONE signature required (NDA use case)")
+    print("     - Uses anchor tag /sn1/ for signature position")
+    print("")
+    print("  3. Signing Group Envelope Test (Free Form)")
+    print("     - Creates envelope with 1+ signers")
+    print("     - Only ONE signature required")
+    print("     - Signer chooses where to place signature")
+    print("     - For PDFs without anchor tags")
     print("")
     print("  4. Check Status / Download Document")
     print("     - Check envelope status")
@@ -50,12 +53,12 @@ def run_test(test_number: int) -> bool:
         return test_jwt_authentication()
 
     elif test_number == 2:
-        from docusign_nda_poc.tests.test_envelope_simple import test_simple_envelope
-        return test_simple_envelope()
-
-    elif test_number == 3:
         from docusign_nda_poc.tests.test_envelope_recipient_group import test_signing_group_envelope
         return test_signing_group_envelope()
+
+    elif test_number == 3:
+        from docusign_nda_poc.tests.test_envelope_free_form import test_free_form_envelope
+        return test_free_form_envelope()
 
     elif test_number == 4:
         from docusign_nda_poc.tests.test_check_status import test_check_status

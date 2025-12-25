@@ -9,8 +9,9 @@ DocuSign API を使用した NDA（秘密保持契約）締結機能の検証用
 ### 主な機能
 
 - JWT Grant 認証によるアクセストークン取得
-- 単一署名者へのエンベロープ送信
-- Signing Group（複数署名者、1人署名で完了）対応
+- Signing Group（1名以上の署名者、1人署名で完了）対応
+  - アンカータグ方式（PDF内に署名位置を埋め込み）
+  - Free Form 方式（署名者が位置を選択）
 - エンベロープステータス確認
 - 署名済みPDFのダウンロード
 - Webhook（DocuSign Connect）によるイベント受信
@@ -33,8 +34,8 @@ docusign_nda_poc/
 │   └── webhook_service.py    # Webhook 処理サービス
 ├── tests/
 │   ├── test_auth.py                      # JWT 認証テスト
-│   ├── test_envelope_simple.py           # 単一署名者テスト
-│   ├── test_envelope_recipient_group.py  # Signing Group テスト
+│   ├── test_envelope_recipient_group.py  # Signing Group テスト（Anchor）
+│   ├── test_envelope_free_form.py        # Signing Group テスト（Free Form）
 │   └── test_check_status.py              # ステータス確認/PDF取得
 └── webhook_output/           # 受信した Webhook データの保存先
 ```
@@ -75,8 +76,8 @@ uv run docusign_nda_poc/run_tests.py
 ```bash
 # テスト番号を引数で指定
 python docusign_nda_poc/run_tests.py 1  # JWT 認証テスト
-python docusign_nda_poc/run_tests.py 2  # 単一署名者テスト
-python docusign_nda_poc/run_tests.py 3  # Signing Group テスト
+python docusign_nda_poc/run_tests.py 2  # Signing Group テスト（Anchor）
+python docusign_nda_poc/run_tests.py 3  # Signing Group テスト（Free Form）
 python docusign_nda_poc/run_tests.py 4  # ステータス確認
 ```
 
@@ -92,27 +93,28 @@ DocuSign への JWT 認証が正常に動作するか確認します。
 
 **初回実行時**: Consent（同意）が必要な場合、URL が表示されます。ブラウザで開いて承認してください。
 
-### Test 2: 単一署名者テスト
+### Test 2: Signing Group テスト（Anchor）
 
-1人の署名者に対してエンベロープを送信します。
+1名以上の署名者を指定し、**誰か1人が署名すれば完了**となるエンベロープを送信します。
 
-- 入力: 署名者のメールアドレス、名前
-- 使用PDF: `app/static/demo_documents/World_Wide_Corp_lorem.pdf`
-- 署名依頼メールが送信されます
-
-### Test 3: Signing Group テスト
-
-複数の署名者を指定し、**誰か1人が署名すれば完了**となるエンベロープを送信します。
-
-- 入力: 2名以上の署名者（メールアドレス、名前）
+- 入力: 1名以上の署名者（メールアドレス、名前）
 - 全員に署名依頼メールが送信される
 - 1人が署名すると、他のメンバーには完了通知が届く
+- 署名位置: PDF内のアンカータグ `/sn1/` で自動配置
 
 これは仕様書の「Academia/Startup側の複数TOメンバーのうち1人が署名すればOK」要件に対応しています。
 
 **実装詳細**: DocuSign の `SigningGroup` API を使用。エンベロープ作成時に一時的な Signing Group を動的に作成し、送信後に削除する方式（アカウント上限50グループを回避）。
 
 > **注意**: DocuSign SDK の `RecipientGroup` クラスは全員にメールが届かないため使用不可。`SigningGroup` を使用すること。
+
+### Test 3: Signing Group テスト（Free Form）
+
+Test 2 と同様の Signing Group 機能ですが、署名位置を署名者が自分で選択します。
+
+- 入力: 1名以上の署名者（メールアドレス、名前）
+- 署名位置: 署名者がPDF上で自分でドラッグ配置
+- アンカータグが埋め込まれていないPDF（ユーザーアップロードPDF等）に対応
 
 ### Test 4: ステータス確認 / PDF 取得
 

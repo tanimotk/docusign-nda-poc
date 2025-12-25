@@ -33,30 +33,112 @@ class Signer:
 
 @dataclass
 class SignaturePosition:
-    """Signature tab position using anchor string"""
+    """Signature tab position using anchor string or fixed coordinates"""
 
     # TODO: 本番環境では、VC/PharmaがアップロードするNDA PDFに埋め込むアンカータグを
     #       事前に決定し、ガイドラインとして提供する必要がある。
     #       例: 「署名欄の位置に /sn1/ と白文字で記載してください」
     #       現在はサンプルPDF (World_Wide_Corp_lorem.pdf) に合わせて /sn1/ を使用。
-    anchor_string: str = "/sn1/"
+
+    # アンカー方式（anchor_string が None でない場合に使用）
+    anchor_string: Optional[str] = "/sn1/"
     anchor_units: str = "pixels"
     anchor_x_offset: str = "20"
     anchor_y_offset: str = "10"
 
+    # 固定座標方式（anchor_string が None の場合に使用）
+    # None の場合は Free Form Signing（署名者が位置を決める）
+    page_number: Optional[str] = None
+    x_position: Optional[str] = None
+    y_position: Optional[str] = None
+
+    @property
+    def use_anchor(self) -> bool:
+        """アンカー方式を使用するかどうか"""
+        return self.anchor_string is not None
+
+    @property
+    def use_fixed_position(self) -> bool:
+        """固定座標方式を使用するかどうか"""
+        return (
+            self.anchor_string is None
+            and self.page_number is not None
+            and self.x_position is not None
+            and self.y_position is not None
+        )
+
+    @property
+    def use_free_form(self) -> bool:
+        """Free Form Signing（署名者が位置を決める）を使用するかどうか"""
+        return self.anchor_string is None and not self.use_fixed_position
+
+    @classmethod
+    def free_form(cls) -> "SignaturePosition":
+        """Free Form Signing用のインスタンスを作成（全フィールド表示）"""
+        return cls(anchor_string=None)
+
+    @classmethod
+    def fixed(cls, page: int = 1, x: int = 100, y: int = 700) -> "SignaturePosition":
+        """固定座標用のインスタンスを作成"""
+        return cls(
+            anchor_string=None,
+            page_number=str(page),
+            x_position=str(x),
+            y_position=str(y),
+        )
+
 
 @dataclass
 class DateSignedPosition:
-    """Date signed tab position using anchor string"""
+    """Date signed tab position using anchor string or fixed coordinates"""
 
     # TODO: 日付欄用のアンカータグも本番では別途定義が必要。
     #       例: /dn1/ を日付記入欄の位置に埋め込んでもらう。
     #       現在はサンプルPDFに日付用アンカーがないため、署名欄と同じタグで
     #       オフセットをずらして配置している（暫定対応）。
-    anchor_string: str = "/sn1/"
+
+    # アンカー方式
+    anchor_string: Optional[str] = "/sn1/"
     anchor_units: str = "pixels"
     anchor_x_offset: str = "120"
     anchor_y_offset: str = "10"
+
+    # 固定座標方式
+    page_number: Optional[str] = None
+    x_position: Optional[str] = None
+    y_position: Optional[str] = None
+
+    @property
+    def use_anchor(self) -> bool:
+        return self.anchor_string is not None
+
+    @property
+    def use_fixed_position(self) -> bool:
+        return (
+            self.anchor_string is None
+            and self.page_number is not None
+            and self.x_position is not None
+            and self.y_position is not None
+        )
+
+    @property
+    def use_free_form(self) -> bool:
+        return self.anchor_string is None and not self.use_fixed_position
+
+    @classmethod
+    def free_form(cls) -> "DateSignedPosition":
+        """Free Form用（日付欄なし）"""
+        return cls(anchor_string=None)
+
+    @classmethod
+    def fixed(cls, page: int = 1, x: int = 200, y: int = 700) -> "DateSignedPosition":
+        """固定座標用のインスタンスを作成"""
+        return cls(
+            anchor_string=None,
+            page_number=str(page),
+            x_position=str(x),
+            y_position=str(y),
+        )
 
 
 @dataclass

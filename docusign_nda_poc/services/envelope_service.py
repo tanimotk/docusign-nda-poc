@@ -172,20 +172,53 @@ class EnvelopeService:
                 routing_order="1",
             )
 
-            # Add signature tabs
-            sign_here = SignHere(
-                anchor_string=request.signature_position.anchor_string,
-                anchor_units=request.signature_position.anchor_units,
-                anchor_x_offset=request.signature_position.anchor_x_offset,
-                anchor_y_offset=request.signature_position.anchor_y_offset,
-            )
-            date_signed = DateSigned(
-                anchor_string=request.date_signed_position.anchor_string,
-                anchor_units=request.date_signed_position.anchor_units,
-                anchor_x_offset=request.date_signed_position.anchor_x_offset,
-                anchor_y_offset=request.date_signed_position.anchor_y_offset,
-            )
-            signer.tabs = Tabs(sign_here_tabs=[sign_here], date_signed_tabs=[date_signed])
+            # Add signature tabs based on position configuration
+            sign_here_tabs = []
+            date_signed_tabs = []
+
+            sig_pos = request.signature_position
+            date_pos = request.date_signed_position
+
+            if sig_pos.use_anchor:
+                # アンカー方式
+                sign_here_tabs.append(SignHere(
+                    anchor_string=sig_pos.anchor_string,
+                    anchor_units=sig_pos.anchor_units,
+                    anchor_x_offset=sig_pos.anchor_x_offset,
+                    anchor_y_offset=sig_pos.anchor_y_offset,
+                ))
+            elif sig_pos.use_fixed_position:
+                # 固定座標方式
+                sign_here_tabs.append(SignHere(
+                    document_id="1",
+                    page_number=sig_pos.page_number,
+                    x_position=sig_pos.x_position,
+                    y_position=sig_pos.y_position,
+                ))
+            # else: Free Form - タブを設定しない（署名者が全フィールドから選択して配置）
+
+            if date_pos.use_anchor:
+                date_signed_tabs.append(DateSigned(
+                    anchor_string=date_pos.anchor_string,
+                    anchor_units=date_pos.anchor_units,
+                    anchor_x_offset=date_pos.anchor_x_offset,
+                    anchor_y_offset=date_pos.anchor_y_offset,
+                ))
+            elif date_pos.use_fixed_position:
+                date_signed_tabs.append(DateSigned(
+                    document_id="1",
+                    page_number=date_pos.page_number,
+                    x_position=date_pos.x_position,
+                    y_position=date_pos.y_position,
+                ))
+            # else: Free Form - 日付タブなし
+
+            # タブがある場合のみ設定
+            if sign_here_tabs or date_signed_tabs:
+                signer.tabs = Tabs(
+                    sign_here_tabs=sign_here_tabs if sign_here_tabs else None,
+                    date_signed_tabs=date_signed_tabs if date_signed_tabs else None,
+                )
 
             # Build event notification if webhook configured
             event_notification = None
